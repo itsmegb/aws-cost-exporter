@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/pkg/errors"
 	"github.com/st8ed/aws-cost-exporter/pkg/collector"
 	"github.com/st8ed/aws-cost-exporter/pkg/fetcher"
 	"github.com/st8ed/aws-cost-exporter/pkg/processor"
@@ -42,31 +43,31 @@ func newGatherer(config *state.Config, state *state.State, client *s3.Client, di
 
 	periods, err := fetcher.GetBillingPeriods(config, client)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error getting billing periods")
 	}
 
 	state.Periods = periods
 
 	if err := collector.Prefetch(state, config, client, reg, periods, logger); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error prefetching")
 	}
 
 	if err := state.Save(config); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error saving state")
 	}
 
 	if err := processor.Compute(config, reg, logger); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "error computing")
 	}
 
-	return prometheus.GathererFunc(func() ([]*dto.MetricFamily, error) {
+	return func() ([]*dto.MetricFamily, error) {
 		if len(state.Periods) > 0 {
 			period := state.Periods[len(state.Periods)-1]
 
 			if period.IsPastDue() {
 				periods, err := fetcher.GetBillingPeriods(config, client)
 				if err != nil {
-					return nil, err
+					return nil, errors.Wrap(err, "error getting periods when past due")
 				}
 
 				state.Periods = periods
@@ -75,22 +76,22 @@ func newGatherer(config *state.Config, state *state.State, client *s3.Client, di
 
 			changed, err := collector.UpdateReport(state, config, client, &period, logger)
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "error updating report when past due")
 			}
 
 			if changed {
 				if err := state.Save(config); err != nil {
-					return nil, err
+					return nil, errors.Wrap(err, "error saving state when past due")
 				}
 
 				if err := processor.Compute(config, reg, logger); err != nil {
-					return nil, err
+					return nil, errors.Wrap(err, "error computing when past due")
 				}
 			}
 		}
 
 		return reg.Gather()
-	}), nil
+	}, nil
 }
 
 func main() {
