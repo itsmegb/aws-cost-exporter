@@ -158,7 +158,7 @@ func main() {
 
 	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithDefaultRegion("us-east-1"))
 	if err != nil {
-		level.Error(logger).Log("err", err)
+		level.Error(logger).Log("msg", "error creating aws config", "err", err)
 		os.Exit(1)
 	}
 
@@ -175,13 +175,13 @@ func main() {
 
 	state, err := state.Load(config)
 	if err != nil {
-		level.Error(logger).Log("err", err)
+		level.Error(logger).Log("msg", "error loading state", "err", err)
 		os.Exit(1)
 	}
 
 	gatherer, err := newGatherer(config, state, client, *disableExporterMetrics, logger)
 	if err != nil {
-		level.Error(logger).Log("err", err)
+		level.Error(logger).Log("msg", "error creating gatherer", "err", err)
 		os.Exit(1)
 	}
 
@@ -204,7 +204,7 @@ func main() {
 	level.Info(logger).Log("msg", "Listening on", "address", *listenAddress)
 	server := &http.Server{Addr: *listenAddress}
 	if err := web.ListenAndServe(server, *configFile, logger); err != nil {
-		level.Error(logger).Log("err", err)
+		level.Error(logger).Log("msg", "error launching server", "err", err)
 		os.Exit(1)
 	}
 }
