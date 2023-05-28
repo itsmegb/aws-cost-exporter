@@ -22,7 +22,7 @@ func Prefetch(
 	logger log.Logger,
 ) error {
 	for i, period := range periods {
-		isLast := (i == len(periods)-1)
+		isLast := i == len(periods)-1
 		_, isCached := state.ReportLastModified[string(period)]
 
 		if !isCached || isLast {

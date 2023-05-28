@@ -1,13 +1,13 @@
 package fetcher
 
 import (
+	"github.com/pkg/errors"
 	"github.com/st8ed/aws-cost-exporter/pkg/state"
 
 	"bufio"
 	"compress/gzip"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -96,13 +96,13 @@ func GetReportManifest(config *state.Config, client *s3.Client, period *state.Bi
 		var ae smithy.APIError
 
 		if !errors.As(err, &ae) {
-			return nil, err
+			return nil, errors.Wrapf(err, "error getting %s", *params.Key)
 		}
 
 		if ae.ErrorCode() == "NotModified" {
 			return nil, nil
 		} else {
-			return nil, err
+			return nil, errors.Wrapf(err, "smithy error getting %s: %s", ae.ErrorCode(), *params.Key)
 		}
 	}
 	defer obj.Body.Close()
@@ -196,7 +196,7 @@ func FetchReport(config *state.Config, client *s3.Client, manifest *ReportManife
 
 		obj, err := client.GetObject(context.TODO(), params)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "failed getting object: %s", *params.Key)
 		}
 		defer obj.Body.Close()
 
@@ -211,7 +211,7 @@ func FetchReport(config *state.Config, client *s3.Client, manifest *ReportManife
 		pipew.Close()
 
 		if err := <-writeErr; err != nil {
-			return err
+			return errors.Wrapf(err, "error writing %s", *params.Key)
 		}
 	}
 
