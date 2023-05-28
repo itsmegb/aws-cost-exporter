@@ -84,7 +84,7 @@ jobs:
           skopeo copy \
             --digestfile /dev/stdout \
             dir:./dist/image \
-            docker://ghcr.io/Propify-API/aws-cost-exporter:$VERSION
+            docker://ghcr.io/propify-api/aws-cost-exporter:$VERSION
 
       - name: Create release
         uses: softprops/action-gh-release@1e07f4398721186383de40550babbdf2b84acfc5
