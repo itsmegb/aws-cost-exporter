@@ -27,7 +27,7 @@ func Compute(config *state.Config, registry *prometheus.Registry, logger log.Log
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5 * time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
 	db, err := sql.Open("csvq", config.RepositoryPath)
@@ -67,7 +67,9 @@ func Compute(config *state.Config, registry *prometheus.Registry, logger log.Log
 		}
 
 		level.Debug(logger).Log("msg", "Updating metrics registry")
-		ingestMetrics(registry, rows)
+		if err := ingestMetrics(registry, rows); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -84,10 +86,10 @@ func ingestMetrics(registry *prometheus.Registry, rows *sql.Rows) error {
 	}
 
 	labelNames := make([]string, 0)
-	labelValuePtrs := make([]*string, 0)
+	labelValuePtrs := make([]interface{}, 0)
 
 	metricNames := make([]string, 0)
-	metricValuePtrs := make([]*float64, 0)
+	metricValuePtrs := make([]interface{}, 0)
 
 	rowValuePtrs := make([]interface{}, len(columns))
 
@@ -100,7 +102,7 @@ func ingestMetrics(registry *prometheus.Registry, rows *sql.Rows) error {
 			metricValuePtrs = append(metricValuePtrs, value)
 			rowValuePtrs[i] = value
 		} else {
-			value := new(string)
+			value := new(sql.NullString)
 
 			labelNames = append(labelNames, column)
 			labelValuePtrs = append(labelValuePtrs, value)
@@ -134,17 +136,21 @@ func ingestMetrics(registry *prometheus.Registry, rows *sql.Rows) error {
 			} else {
 				return err
 			}
-		} else {
-			labelValues := make([]string, len(labelValuePtrs))
+		}
+		labelValues := make([]string, len(labelValuePtrs))
 
-			for i := range labelValuePtrs {
-				labelValues[i] = *labelValuePtrs[i]
-			}
-
-			for i, gauge := range gauges {
-				gauge.WithLabelValues(labelValues...).Set(*metricValuePtrs[i])
+		for i, value := range labelValuePtrs {
+			if value.(*sql.NullString).Valid {
+				labelValues[i] = value.(*sql.NullString).String
+			} else {
+				labelValues[i] = ""
 			}
 		}
+
+		for i, gauge := range gauges {
+			gauge.WithLabelValues(labelValues...).Set(*(metricValuePtrs[i].(*float64)))
+		}
+
 	}
 
 	return nil
